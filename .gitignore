@@ -1,9 +1,10 @@
-runs/
-*.log
-.DS_Store
-.pi/
-tests/private/
-.env
 auth.json
-*.pem
+.DS_Store
+.env
 *.key
+*.log
+*.pem
+.pi/
+.pi-web/
+runs/
+tests/private/
