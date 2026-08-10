@@ -2,8 +2,8 @@
 
 ## SuppperGrok (design upstream)
 
-- Linux port reference: local `/home/zeroth/supppergrok` and
-  https://github.com/qiuxinyuan321/supppergrok
+- Reference: https://github.com/qiuxinyuan321/supppergrok
+  (and Linux ports such as supppergrok-linux)
 - Author (Windows original): [@qiuxinyuan321](https://github.com/qiuxinyuan321)
 - License: MIT
 
