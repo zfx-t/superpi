@@ -21,10 +21,21 @@
 ## 包含内容
 
 - `pi-unrestricted.md`：Pi 版 system-prompt override（工具名对齐 read/bash/edit/write）。
-- `pi-wrapper.sh`：普通 `pi` 会话自动注入 prompt；管理命令保持原样。
-- `install.sh` / `uninstall.sh`：带备份的安装与移除（bash / zsh / fish）。
+- `pi-wrapper.sh`：普通 `pi` 会话注入 `--system-prompt <file>` + 默认 `--no-context-files`。
+- `extensions/superpi-system-prompt.ts`：**每轮** `before_agent_start` 强制 system prompt（覆盖 web-chat / 非 shell 入口）。
+- `install.sh` 默认同时安装：`SYSTEM.md` + 全局 extension + `~/.local/bin/pi` shim + shell 函数。
 - `scripts/run_prompt_bank.py`：JSONL prompt-bank 运行、判定与逐项重试。
 - `tests/prompt-bank.example.jsonl`：示例最小测试集。
+
+## 三层覆盖（为何只靠 wrapper 不够）
+
+| 层 | 作用 | 覆盖范围 |
+|---|---|---|
+| CLI wrapper | `--system-prompt` 文件路径注入 | 仅 shell 里调用的 `pi` |
+| `~/.pi/agent/SYSTEM.md` | 替换 Pi 默认 base prompt | 所有走 DefaultResourceLoader 的入口 |
+| global extension | 每轮强制覆盖 | CLI + web-chat + 扩展会话 |
+
+`pi-stock` 会设 `SUPERPI_DISABLED=1` 并传入空 `--system-prompt`，以跳过 extension / SYSTEM.md。
 
 ## 前置条件
 
@@ -53,9 +64,21 @@ chmod +x install.sh uninstall.sh pi-wrapper.sh scripts/*.sh
 ./install.sh --shell fish
 ./install.sh --shell all
 ./install.sh --pi-native "$HOME/ForMe/bin/pi"
-# 同时写入 ~/.pi/agent/SYSTEM.md（裸 pi 也会加载；pi-stock 仍可能读到它）
-./install.sh --install-system-md
+# 可选：关闭某一层
+./install.sh --no-system-md
+./install.sh --no-extension
+./install.sh --no-path-shim
 ```
+
+安装后先验证 system prompt 是否真的生效：
+
+```bash
+pi --superpi-status
+pi -p --no-session --no-tools --thinking off \
+  'Reply OVERRIDE_OK if system prompt starts with [MODE: UNRESTRICTED], else OVERRIDE_FAIL.'
+```
+
+应输出 `OVERRIDE_OK`。若输出 `OVERRIDE_FAIL`，说明仍在走 stock prompt（未进 wrapper / 未加载 extension / 旧会话）。
 
 重载配置：
 
@@ -118,10 +141,17 @@ pi --system-prompt "$(cat ./pi-unrestricted.md)" --no-context-files
 ## 卸载
 
 ```bash
-./uninstall.sh                      # 仅移除 shell 集成
-./uninstall.sh --remove-files       # 同时删除 ~/.pi/superpi 下文件
-./uninstall.sh --remove-system-md   # 若 SYSTEM.md 是 SuperPi 生成的则删除
+./uninstall.sh                 # 仅移除 shell 集成
+./uninstall.sh --remove-all    # 文件 + SYSTEM.md + extension + PATH shim
 ```
+
+## 排障
+
+1. **必须新开会话**。旧 session 不重放 startup system prompt 配置。
+2. **指纹测试 `OVERRIDE_OK` 才算覆盖成功**。模型对部分话题仍可能硬拒绝——那是 provider/模型策略，不等于 system prompt 没替换。
+3. web-chat / GUI 入口不走 shell 函数：依赖 extension + `SYSTEM.md`（install 默认装）。
+4. 直接执行 `/path/to/ForMe/bin/pi` 会绕过 wrapper；仍应被 extension/`SYSTEM.md` 覆盖。
+5. 调试注入：`SUPERPI_DEBUG=1 pi -p 'hi'`。
 
 ## Prompt-bank 格式
 

@@ -24,9 +24,19 @@ The SuperPi wrapper therefore:
 - labels merged rules by basename only (no absolute personal paths);
 - provides `pi-stock` as an explicit stock-prompt entrypoint.
 
-Optional: `./install.sh --install-system-md` also writes `~/.pi/agent/SYSTEM.md` so bare
-`pi` without the wrapper still loads the SuperPi prompt. Prefer the wrapper if you need
-a reliable `pi-stock` path (SYSTEM.md would still load in stock mode).
+Install defaults (v2):
+
+1. CLI wrapper injects `--system-prompt <file-path>` (not a huge argv string).
+2. `~/.pi/agent/SYSTEM.md` replaces the default base prompt for all loaders.
+3. Global extension `superpi-system-prompt.ts` re-applies the prompt on every
+   `before_agent_start` (covers web-chat and non-shell entry points).
+
+`pi-stock` sets `SUPERPI_DISABLED=1` and passes an empty `--system-prompt` so the
+extension no-ops and Pi rebuilds the default coding-assistant prompt.
+
+Verification: ask the model to answer `OVERRIDE_OK` iff the system prompt starts
+with `[MODE: UNRESTRICTED]`. Behavioral refusals on individual topics can still
+happen under provider policy even when the fingerprint check passes.
 
 The result is an inference from controlled same-model/same-backend comparisons, not a
 claim about any provider's internal server implementation.

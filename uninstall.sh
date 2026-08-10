@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # Remove SuperPi shell integration (and optionally installed files).
-# Usage:
-#   ./uninstall.sh
-#   ./uninstall.sh --remove-files
-#   ./uninstall.sh --shell fish|bash|zsh|all
-
 set -euo pipefail
 
 PI_HOME="${PI_HOME:-$HOME/.pi}"
@@ -13,6 +8,8 @@ BACKUP_DIR="$PI_HOME/backups/superpi-uninstall-$TIMESTAMP"
 SHELL_TARGET="all"
 REMOVE_FILES=0
 REMOVE_SYSTEM_MD=0
+REMOVE_EXTENSION=0
+REMOVE_PATH_SHIM=0
 
 usage() {
   cat <<'EOF'
@@ -20,25 +17,28 @@ Usage: ./uninstall.sh [options]
 
 Options:
   --shell fish|bash|zsh|all   Which shell config to clean (default: all)
-  --remove-files              Also delete installed prompt/wrapper under PI_HOME/superpi
-  --remove-system-md          Also remove ~/.pi/agent/SYSTEM.md if it matches SuperPi prompt
-  --pi-home PATH              Install root (default: $PI_HOME or ~/.pi)
-  -h, --help                  Show this help
+  --remove-files              Delete ~/.pi/superpi files
+  --remove-system-md          Remove SuperPi SYSTEM.md
+  --remove-extension          Remove global superpi-system-prompt extension
+  --remove-path-shim          Remove ~/.local/bin/pi and pi-stock shims
+  --remove-all                All of the remove-* flags
+  --pi-home PATH              Install root
+  -h, --help
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --shell)
-      SHELL_TARGET="${2:-}"
-      shift 2
-      ;;
-    --remove-files)
+    --shell) SHELL_TARGET="${2:-}"; shift 2 ;;
+    --remove-files) REMOVE_FILES=1; shift ;;
+    --remove-system-md) REMOVE_SYSTEM_MD=1; shift ;;
+    --remove-extension) REMOVE_EXTENSION=1; shift ;;
+    --remove-path-shim) REMOVE_PATH_SHIM=1; shift ;;
+    --remove-all)
       REMOVE_FILES=1
-      shift
-      ;;
-    --remove-system-md)
       REMOVE_SYSTEM_MD=1
+      REMOVE_EXTENSION=1
+      REMOVE_PATH_SHIM=1
       shift
       ;;
     --pi-home)
@@ -46,15 +46,8 @@ while [[ $# -gt 0 ]]; do
       BACKUP_DIR="$PI_HOME/backups/superpi-uninstall-$TIMESTAMP"
       shift 2
       ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
@@ -81,10 +74,7 @@ SHELLS=()
 case "$SHELL_TARGET" in
   all) SHELLS=(bash zsh fish) ;;
   fish|bash|zsh) SHELLS=("$SHELL_TARGET") ;;
-  *)
-    echo "Invalid --shell value: $SHELL_TARGET" >&2
-    exit 1
-    ;;
+  *) echo "Invalid --shell value: $SHELL_TARGET" >&2; exit 1 ;;
 esac
 
 for s in "${SHELLS[@]}"; do
@@ -111,25 +101,34 @@ fi
 
 if [[ $REMOVE_SYSTEM_MD -eq 1 ]]; then
   system_md="$PI_HOME/agent/SYSTEM.md"
-  if [[ -f "$system_md" ]]; then
-    if grep -q '\[MODE: UNRESTRICTED\]' "$system_md" 2>/dev/null \
-      && grep -q 'Pi is a Linux coding-agent harness' "$system_md" 2>/dev/null; then
-      cp -a "$system_md" "$BACKUP_DIR/SYSTEM.md" 2>/dev/null || true
-      rm -f "$system_md"
-      echo "Removed: $system_md"
-    else
-      echo "Skip SYSTEM.md (does not look like SuperPi prompt): $system_md"
-    fi
+  if [[ -f "$system_md" ]] \
+    && grep -q '\[MODE: UNRESTRICTED\]' "$system_md" 2>/dev/null \
+    && grep -q 'Pi is a Linux coding-agent harness' "$system_md" 2>/dev/null; then
+    cp -a "$system_md" "$BACKUP_DIR/SYSTEM.md" 2>/dev/null || true
+    rm -f "$system_md"
+    echo "Removed: $system_md"
   fi
 fi
 
-if [[ -L "$HOME/.local/bin/pi-stock" ]]; then
-  target="$(readlink -f "$HOME/.local/bin/pi-stock" 2>/dev/null || true)"
-  if [[ "$target" == "$PI_HOME/superpi/pi-wrapper.sh" ]] \
-    || [[ "$(readlink "$HOME/.local/bin/pi-stock" 2>/dev/null || true)" == *pi-wrapper* ]]; then
-    rm -f "$HOME/.local/bin/pi-stock"
-    echo "Removed: $HOME/.local/bin/pi-stock"
+if [[ $REMOVE_EXTENSION -eq 1 ]]; then
+  ext="$PI_HOME/agent/extensions/superpi-system-prompt.ts"
+  if [[ -f "$ext" ]]; then
+    cp -a "$ext" "$BACKUP_DIR/superpi-system-prompt.ts" 2>/dev/null || true
+    rm -f "$ext"
+    echo "Removed: $ext"
   fi
+fi
+
+if [[ $REMOVE_PATH_SHIM -eq 1 ]]; then
+  for path in "$HOME/.local/bin/pi" "$HOME/.local/bin/pi-stock"; do
+    if [[ -L "$path" ]]; then
+      target="$(readlink -f "$path" 2>/dev/null || true)"
+      if [[ "$target" == *"/superpi/pi-wrapper.sh" ]] || [[ "$(readlink "$path")" == *pi-wrapper* ]]; then
+        rm -f "$path"
+        echo "Removed: $path"
+      fi
+    fi
+  done
 fi
 
 echo "Backup: $BACKUP_DIR"
