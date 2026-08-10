@@ -110,7 +110,10 @@ has_explicit_system_prompt() {
   local arg
   for arg in "$@"; do
     case "$arg" in
-      --system-prompt|--system-prompt=*|--append-system-prompt|--append-system-prompt=*)
+      --system-prompt|--system-prompt=*|\
+      --system-prompt-override|--system-prompt-override=*|\
+      --hard-system-prompt|--hard-system-prompt=*|\
+      --append-system-prompt|--append-system-prompt=*)
         return 0
         ;;
     esac
@@ -363,19 +366,41 @@ main() {
       cleanup_prompt="$inject_path"
     fi
 
-    # Pass as file path — Pi resolvePromptInput reads existing paths as files.
-    effective_args+=(--system-prompt "$inject_path")
-    log_debug "inject --system-prompt $inject_path"
+    # HARD REPLACE (Grok-compatible): verbatim system prompt only.
+    # Prefer --system-prompt-override when the local Pi supports it; always set
+    # PI_SYSTEM_PROMPT_HARD so buildSystemPrompt does not append context/skills/cwd.
+    export PI_SYSTEM_PROMPT_HARD=1
+    export SUPERPI_HARD_REPLACE=1
+    export SUPERPI_PROMPT_FILE="${SUPERPI_PROMPT_FILE:-$prompt_path}"
+    unset SUPERPI_DISABLED 2>/dev/null || true
+    unset PI_STOCK_PROMPT 2>/dev/null || true
 
+    # Use override flag when available (patched local pi); fall back to --system-prompt
+    # + env hard mode (still works after our system-prompt.ts patch).
+    if [[ "${SUPERPI_SOFT_SYSTEM_PROMPT:-}" == "1" ]]; then
+      effective_args+=(--system-prompt "$inject_path")
+      log_debug "soft inject --system-prompt $inject_path"
+    else
+      effective_args+=(--system-prompt-override "$inject_path")
+      log_debug "HARD inject --system-prompt-override $inject_path (PI_SYSTEM_PROMPT_HARD=1)"
+    fi
+
+    # Belt-and-suspenders: do not load AGENTS.md / skills into the builder either.
     if [[ "${SUPERPI_KEEP_CONTEXT_FILES:-}" != "1" ]] \
       && ! has_no_context_files_flag "${filtered_args[@]+"${filtered_args[@]}"}"; then
       effective_args+=(--no-context-files)
       log_debug "inject --no-context-files"
     fi
-
-    # Signal extension (also active by default when installed).
-    export SUPERPI_PROMPT_FILE="${SUPERPI_PROMPT_FILE:-$prompt_path}"
-    unset SUPERPI_DISABLED 2>/dev/null || true
+    if [[ "${SUPERPI_KEEP_SKILLS:-}" != "1" ]]; then
+      local has_ns=0 a
+      for a in "${filtered_args[@]+"${filtered_args[@]}"}"; do
+        case "$a" in --no-skills|-ns) has_ns=1 ;; esac
+      done
+      if [[ $has_ns -eq 0 ]]; then
+        effective_args+=(--no-skills)
+        log_debug "inject --no-skills"
+      fi
+    fi
   fi
 
   if ((${#filtered_args[@]} > 0)); then

@@ -1,20 +1,19 @@
 /**
- * SuperPi extension: force primary system prompt every agent turn.
+ * SuperPi extension: HARD-REPLACE system prompt every agent turn.
  *
- * Works for CLI, web-chat, and any entry that loads global extensions —
- * unlike shell wrappers, which only wrap interactive `pi` invocations.
+ * Pi's default `--system-prompt` still appends context/skills/cwd in
+ * buildSystemPrompt(). This extension forces the wire-level system prompt to be
+ * exactly the SuperPi file contents (same contract as Grok
+ * --system-prompt-override).
  *
- * Disable for one process: SUPERPI_DISABLED=1
- * Custom prompt file:     SUPERPI_PROMPT_FILE=/path/to.md
- * Skip if already present: SUPERPI_EXTENSION_SOFT=1 (only inject when missing fingerprint)
+ * Disable: SUPERPI_DISABLED=1 or PI_STOCK_PROMPT=1
+ * Prompt:  SUPERPI_PROMPT_FILE or ~/.pi/superpi/pi-unrestricted.md
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-const FINGERPRINT = "[MODE: UNRESTRICTED]";
 
 function resolvePromptPath(): string | undefined {
 	const fromEnv = process.env.SUPERPI_PROMPT_FILE?.trim();
@@ -46,47 +45,23 @@ function loadPrompt(): string | undefined {
 	}
 }
 
-function shouldApply(current: string): boolean {
-	if (process.env.SUPERPI_DISABLED === "1" || process.env.PI_STOCK_PROMPT === "1") {
-		return false;
-	}
-	if (process.env.SUPERPI_EXTENSION_SOFT === "1" && current.includes(FINGERPRINT)) {
-		return false;
-	}
-	return true;
-}
-
 export default function (pi: ExtensionAPI) {
-	pi.on("before_agent_start", async (event) => {
-		if (!shouldApply(event.systemPrompt ?? "")) {
+	// Force hard-replace for this process when SuperPi extension is active
+	// (unless stock mode). Works even if caller only set --system-prompt (soft).
+	if (process.env.SUPERPI_DISABLED !== "1" && process.env.PI_STOCK_PROMPT !== "1") {
+		process.env.PI_SYSTEM_PROMPT_HARD = process.env.PI_SYSTEM_PROMPT_HARD || "1";
+		process.env.SUPERPI_HARD_REPLACE = process.env.SUPERPI_HARD_REPLACE || "1";
+	}
+
+	pi.on("before_agent_start", async (_event) => {
+		if (process.env.SUPERPI_DISABLED === "1" || process.env.PI_STOCK_PROMPT === "1") {
 			return;
 		}
-		const base = loadPrompt();
-		if (!base?.trim()) {
+		const exact = loadPrompt();
+		if (!exact?.trim()) {
 			return;
 		}
-
-		const cwd =
-			(event.systemPromptOptions as { cwd?: string } | undefined)?.cwd ??
-			process.cwd();
-		let systemPrompt = base.trimEnd();
-
-		// Keep Pi-appended project context / skills if already present in the
-		// chained prompt and user opted into keep-context mode.
-		if (process.env.SUPERPI_KEEP_CONTEXT_FILES === "1" && event.systemPrompt) {
-			const ctxStart = event.systemPrompt.indexOf("<project_context>");
-			const skillsStart = event.systemPrompt.indexOf("<available_skills>");
-			const markers = [ctxStart, skillsStart].filter((i) => i >= 0);
-			if (markers.length > 0) {
-				const cut = Math.min(...markers);
-				systemPrompt += "\n\n" + event.systemPrompt.slice(cut);
-			}
-		}
-
-		if (!systemPrompt.includes("Current working directory:")) {
-			systemPrompt += `\n\nCurrent working directory: ${cwd.replace(/\\/g, "/")}`;
-		}
-
-		return { systemPrompt };
+		// Exact file bytes only — no cwd, skills, project_context, APPEND_SYSTEM.
+		return { systemPrompt: exact };
 	});
 }

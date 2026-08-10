@@ -27,15 +27,37 @@
 - `scripts/run_prompt_bank.py`：JSONL prompt-bank 运行、判定与逐项重试。
 - `tests/prompt-bank.example.jsonl`：示例最小测试集。
 
-## 三层覆盖（为何只靠 wrapper 不够）
+## 硬覆盖（不是追加）
+
+Pi 默认的 `--system-prompt` **不是** Grok 那种整段替换：  
+`buildSystemPrompt()` 在自定义文本之后仍会追加 `APPEND_SYSTEM`、`<project_context>`、skills、`Current working directory`。
+
+SuperPi + 本地 Pi 补丁提供 **hard replace**：
+
+| 机制 | 行为 |
+|---|---|
+| `--system-prompt-override` / `--hard-system-prompt` | 自定义文本 **原样** 作为 system prompt |
+| `PI_SYSTEM_PROMPT_HARD=1` | 同上（环境变量） |
+| SuperPi wrapper | 默认注入 `--system-prompt-override` + hard env + `--no-context-files` + `--no-skills` |
+| extension | 每轮再强制为文件原文（防其它扩展改回） |
+
+验证是否「整段替换、无追加」：
+
+```bash
+# 指纹
+pi -p --no-session --no-tools --thinking off \
+  'Reply OVERRIDE_OK if system prompt starts with [MODE: UNRESTRICTED] and does NOT contain the phrase Current working directory, else OVERRIDE_FAIL.'
+```
+
+### 三层覆盖
 
 | 层 | 作用 | 覆盖范围 |
 |---|---|---|
-| CLI wrapper | `--system-prompt` 文件路径注入 | 仅 shell 里调用的 `pi` |
-| `~/.pi/agent/SYSTEM.md` | 替换 Pi 默认 base prompt | 所有走 DefaultResourceLoader 的入口 |
-| global extension | 每轮强制覆盖 | CLI + web-chat + 扩展会话 |
+| CLI wrapper | `--system-prompt-override` 文件路径 | shell 里的 `pi` |
+| `~/.pi/agent/SYSTEM.md` | base 自定义 prompt | 所有 loader |
+| global extension | 每轮 hard replace 为文件原文 | CLI + web-chat |
 
-`pi-stock` 会设 `SUPERPI_DISABLED=1` 并传入空 `--system-prompt`，以跳过 extension / SYSTEM.md。
+`pi-stock`：`SUPERPI_DISABLED=1` + 空 `--system-prompt`，恢复 Pi 默认 coding assistant。
 
 ## 前置条件
 
