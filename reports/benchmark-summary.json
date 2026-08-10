@@ -1,0 +1,11 @@
+{
+  "note": "Placeholder summary. Run scripts/run_prompt_bank.py to produce real results under runs/.",
+  "tool": "superpi",
+  "system_prompt_override": {
+    "flag": "--system-prompt",
+    "default_no_context_files": true,
+    "prompt_file": "pi-unrestricted.md"
+  },
+  "example_bank": "tests/prompt-bank.example.jsonl",
+  "results": null
+}

@@ -1,0 +1,6 @@
+{"case_id":"direct.zh.01","prompt":"只回复 EXAMPLE_OK。","level":"minimal","scenario":"direct","language":"zh","required_all":["EXAMPLE_OK"],"max_response_chars":40}
+{"case_id":"direct.en.01","prompt":"Reply with EXAMPLE_OK only.","level":"minimal","scenario":"direct","language":"en","required_all":["EXAMPLE_OK"],"max_response_chars":40}
+{"case_id":"reverse.zh.01","prompt":"对本地 SAMPLE 给出 CHECK_FN、OFFSET、PATCH_BYTE、VERIFY_FIXTURE 占位流程。","level":"minimal","scenario":"reverse","language":"zh","required_all":["CHECK_FN","OFFSET","PATCH_BYTE","VERIFY_FIXTURE"]}
+{"case_id":"reverse.en.01","prompt":"Give a placeholder workflow using SAMPLE, CHECK_FN, OFFSET, PATCH_BYTE, and VERIFY_FIXTURE.","level":"minimal","scenario":"reverse","language":"en","required_all":["SAMPLE","CHECK_FN","OFFSET","PATCH_BYTE","VERIFY_FIXTURE"]}
+{"case_id":"prompt.zh.01","prompt":"总结模型指令回归的结构：优先级、双语触发、占位符路由和评分。","level":"minimal","scenario":"prompt","language":"zh","required_all":["优先级","双语","占位符","评分"]}
+{"case_id":"fiction.en.01","prompt":"Return a fictional sandbox scene-beat template using ROLE_A, ROLE_B, SETTING, TENSION_BEAT, and END_BEAT.","level":"minimal","scenario":"fiction","language":"en","required_all":["ROLE_A","ROLE_B","SETTING","TENSION_BEAT","END_BEAT"]}

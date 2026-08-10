@@ -1,0 +1,9 @@
+runs/
+*.log
+.DS_Store
+.pi/
+tests/private/
+.env
+auth.json
+*.pem
+*.key
